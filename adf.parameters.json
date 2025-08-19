@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "factoryName": { "value": "${{ secrets.ADF_NAME }}" },
+
+    "Ls_sql25_password": { "value": "${{ secrets.LS_SQL25_PASSWORD }}" },
+    "Ls_sql25_properties_typeProperties_server": { "value": "mysqlsserver2025.database.windows.net" },
+    "Ls_sql25_properties_typeProperties_database": { "value": "sqldatabase25" },
+    "Ls_sql25_properties_typeProperties_userName": { "value": "admin2025" },
+
+    "ls_datalake25_accountKey": { "value": "${{ secrets.LS_DATALAKE25_KEY }}" },
+    "ls_datalake25_properties_typeProperties_url": { "value": "https://mydatalaess25.dfs.core.windows.net/" },
+
+    "ls_mysqldatabase_password": { "value": "${{ secrets.LS_MYSQL_PASSWORD }}" },
+    "ls_mysqldatabase_properties_typeProperties_server": { "value": "mysqlsserver2025.database.windows.net" },
+    "ls_mysqldatabase_properties_typeProperties_database": { "value": "mydatabasepractice2025" },
+    "ls_mysqldatabase_properties_typeProperties_userName": { "value": "admin2025" },
+
+    "ls_sqldatabase25_password": { "value": "${{ secrets.LS_SQLDB25_PASSWORD }}" },
+    "ls_sqldatabase25_properties_typeProperties_server": { "value": "mysqlsserver2025.database.windows.net" },
+    "ls_sqldatabase25_properties_typeProperties_database": { "value": "sqldatabase25" },
+    "ls_sqldatabase25_properties_typeProperties_userName": { "value": "admin2025" }
+  }
+}
