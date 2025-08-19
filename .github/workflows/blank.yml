@@ -58,8 +58,8 @@ jobs:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ secrets.ADF2_RESOURCE_GROUP }}
           template: mydatasfactorys2025/ARMTemplateForFactory.json
-          parametersFile: mydatasfactorys2025/ARMTemplateParametersForFactory.json
           parameters: |
+            @mydatasfactorys2025/ARMTemplateParametersForFactory.json
             factoryName=${{ secrets.ADF2_NAME }}
             Ls_sql25_password=${{ secrets.LS_SQL25_PASSWORD }}
             ls_mysqldatabase_password=${{ secrets.LS_MYSQL_PASSWORD }}
