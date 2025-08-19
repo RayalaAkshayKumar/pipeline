@@ -3,7 +3,7 @@ name: Deploy ADF to Prod (on publish)
 on:
   push:
     branches:
-      - adf_publish   # run whenever ADF Studio publishes
+      - main  # run whenever ADF Studio publishes
   workflow_dispatch:    # Allow manual triggering
 
 permissions:
