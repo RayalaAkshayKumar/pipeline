@@ -54,7 +54,7 @@ jobs:
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ secrets.ADF2_RESOURCE_GROUP }}
-          template: adf_publish/ARMTemplateForFactory.json
+          template: mydatasfactorys2025/ARMTemplateForFactory.json
           parameters: |
             mydatasfactorys2025/ARMTemplateParametersForFactory.json
             .adf/prod.parameters.json
