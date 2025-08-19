@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - adf_publish   # run whenever ADF Studio publishes
+  workflow_dispatch:    # Allow manual triggering
 
 permissions:
   id-token: write
@@ -12,16 +13,18 @@ permissions:
 jobs:
   deploy-adf:
     runs-on: ubuntu-latest
+    environment: production  # Add environment protection
+    
     env:
       ADF2_NAME: ${{ secrets.ADF2_NAME }}
-      ADF2_RG:   ${{ secrets.ADF2_RESOURCE_GROUP }}
-
+      ADF2_RG: ${{ secrets.ADF2_RESOURCE_GROUP }}
+      
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
+        
       - name: Azure login (client secret)
-        uses: azure/login@v1
+        uses: azure/login@v2  # Updated to v2
         with:
           creds: |
             {
@@ -30,27 +33,58 @@ jobs:
               "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
               "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
             }
-
+            
       - name: Ensure Data Factory CLI extension
         run: |
           az extension add --name datafactory --only-show-errors || az extension update --name datafactory
-
+          
+      # Validate ARM template before deployment
+      - name: Validate ARM template
+        run: |
+          az deployment group validate \
+            --resource-group "$ADF2_RG" \
+            --template-file adf_publish/ARMTemplateForFactory.json \
+            --parameters @adf_publish/ARMTemplateParametersForFactory.json \
+            --parameters @.adf/prod.parameters.json \
+            --parameters factoryName="$ADF2_NAME"
+            
+      # Get list of currently running triggers to restart later
+      - name: Get running triggers before stopping
+        id: get-triggers
+        run: |
+          running_triggers=$(az datafactory trigger list \
+            --resource-group "$ADF2_RG" \
+            --factory-name "$ADF2_NAME" \
+            --query "[?properties.runtimeState=='Started'].name" -o tsv | tr '\n' ' ')
+          echo "running_triggers=$running_triggers" >> $GITHUB_OUTPUT
+          echo "Found running triggers: $running_triggers"
+        shell: bash
+        
       # Stop triggers in PROD before deploy (safer updates)
       - name: Stop running triggers in PROD
         run: |
-          names=$(az datafactory trigger list \
-            --resource-group "$ADF2_RG" \
-            --factory-name "$ADF2_NAME" \
-            --query "[?properties.runtimeState=='Started'].name" -o tsv)
-          for n in $names; do
-            echo "Stopping trigger: $n"
-            az datafactory trigger stop --resource-group "$ADF2_RG" --factory-name "$ADF2_NAME" --name "$n"
-          done
+          triggers="${{ steps.get-triggers.outputs.running_triggers }}"
+          if [ -n "$triggers" ]; then
+            for trigger in $triggers; do
+              echo "Stopping trigger: $trigger"
+              az datafactory trigger stop \
+                --resource-group "$ADF2_RG" \
+                --factory-name "$ADF2_NAME" \
+                --name "$trigger" \
+                --no-wait
+            done
+            
+            # Wait for triggers to stop
+            echo "Waiting for triggers to stop..."
+            sleep 30
+          else
+            echo "No running triggers found"
+          fi
         shell: bash
-
+        
       # Deploy ARM templates that ADF generated in adf_publish
       - name: Deploy ARM template to PROD
-        uses: azure/arm-deploy@v1
+        uses: azure/arm-deploy@v2  # Updated to v2
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ secrets.ADF2_RESOURCE_GROUP }}
@@ -60,16 +94,49 @@ jobs:
             .adf/prod.parameters.json
             factoryName=${{ secrets.ADF2_NAME }}
           deploymentName: adf-publish-${{ github.run_number }}
-
-      # Start triggers again after deployment
-      - name: Start stopped triggers in PROD
+          failOnStdErr: false  # ADF deployments can have warnings
+          
+      # Start only the triggers that were previously running
+      - name: Start previously running triggers
         run: |
-          names=$(az datafactory trigger list \
-            --resource-group "$ADF2_RG" \
-            --factory-name "$ADF2_NAME" \
-            --query "[?properties.runtimeState=='Stopped'].name" -o tsv)
-          for n in $names; do
-            echo "Starting trigger: $n"
-            az datafactory trigger start --resource-group "$ADF2_RG" --factory-name "$ADF2_NAME" --name "$n"
-          done
+          triggers="${{ steps.get-triggers.outputs.running_triggers }}"
+          if [ -n "$triggers" ]; then
+            for trigger in $triggers; do
+              echo "Starting trigger: $trigger"
+              az datafactory trigger start \
+                --resource-group "$ADF2_RG" \
+                --factory-name "$ADF2_NAME" \
+                --name "$trigger" \
+                --no-wait
+            done
+            echo "Started triggers: $triggers"
+          else
+            echo "No triggers to restart"
+          fi
         shell: bash
+        
+      # Verify deployment success
+      - name: Verify deployment
+        run: |
+          echo "Verifying Data Factory deployment..."
+          factory_state=$(az datafactory show \
+            --resource-group "$ADF2_RG" \
+            --name "$ADF2_NAME" \
+            --query "properties.provisioningState" -o tsv)
+          echo "Factory provisioning state: $factory_state"
+          
+          if [ "$factory_state" != "Succeeded" ]; then
+            echo "❌ Deployment verification failed"
+            exit 1
+          else
+            echo "✅ Deployment verified successfully"
+          fi
+        shell: bash
+        
+      # Optional: Send notification on failure
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "🚨 ADF deployment failed for commit ${{ github.sha }}"
+          echo "Check the logs at: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Add your notification logic here (Slack, Teams, email, etc.)
