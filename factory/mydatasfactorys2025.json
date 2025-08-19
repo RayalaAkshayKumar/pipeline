@@ -1,0 +1,9 @@
+{
+	"name": "mydatasfactorys2025",
+	"location": "eastasia",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "eec53d98-60f0-4b8c-b5c3-2e871f26e1d2",
+		"tenantId": "5d3a62c8-dc46-4742-9ff8-2d0fd82d53c9"
+	}
+}
