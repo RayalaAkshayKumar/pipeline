@@ -3,7 +3,7 @@ name: Deploy ADF CI/CD
 on:
   push:
     branches:
-      - main
+      - adf_publish
 
 env:
   ADF_NAME: mydatasfactorys2025
