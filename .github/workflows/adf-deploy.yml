@@ -3,11 +3,7 @@ name: Deploy ADF to Prod (on publish)
 on:
   push:
     branches:
-      - main   # run henever ADF Studio publishes
-
-permissions:
-  id-token: write
-  contents: read
+      - main   # run whenever ADF Studio publishes
 
 jobs:
   deploy-adf:
@@ -30,12 +26,9 @@ jobs:
               "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
               "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
             }
-
       - name: Ensure Data Factory CLI extension
         run: |
           az extension add --name datafactory --only-show-errors || az extension update --name datafactory
-
-      # Stop triggers in PROD before deploy (safer updates)
       - name: Stop running triggers in PROD
         run: |
           names=$(az datafactory trigger list \
@@ -48,20 +41,16 @@ jobs:
           done
         shell: bash
 
-      # Deploy ARM templates that ADF generated in adf_publish
       - name: Deploy ARM template to PROD
-        uses: azure/arm-deploy@v1
+        uses: azure/arm-deploy@v2
         with:
+          scope: resourcegroup
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ secrets.ADF2_RESOURCE_GROUP }}
-          template: adf_publish/ARMTemplateForFactory.json
-          parameters: |
-            adf_publish/ARMTemplateParametersForFactory.json
-            .adf/prod.parameters.json
-            factoryName=${{ secrets.ADF2_NAME }}
+          template: ./mydatasfactorys2025/ARMTemplateForFactory.json
+          parameters: ./mydatasfactorys2025/ARMTemplateParametersForFactory.json
           deploymentName: adf-publish-${{ github.run_number }}
 
-      # Start triggers again after deployment
       - name: Start stopped triggers in PROD
         run: |
           names=$(az datafactory trigger list \
