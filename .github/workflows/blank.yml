@@ -1,115 +1,32 @@
-name: Deploy ADF to Prod
+name: Deploy ADF to ADF2
 
 on:
   push:
     branches:
-      - adf_publish   # Runs when ADF Studio publishes
-
-permissions:
-  id-token: write
-  contents: read
+      - adf_publish   # Deploy only when ARM templates are updated
 
 jobs:
-  deploy-adf:
+  deploy:
     runs-on: ubuntu-latest
-    env:
-      ADF_NAME: ${{ secrets.ADF_NAME }}
-      ADF_RESOURCE_GROUP: ${{ secrets.ADF_RESOURCE_GROUP }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-      - name: Azure Login
-        uses: azure/login@v1
+      - name: Login to Azure
+        uses: azure/login@v2
         with:
-          creds: |
-            {
-              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
-              "tenantId": "${{ secrets.AZURE_TENANT_ID }}",
-              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
-              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-            }
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-      - name: Ensure Data Factory CLI extension
-        run: |
-          az extension add --name datafactory --only-show-errors || az extension update --name datafactory
-
-      - name: Debug Environment Variables
-        run: |
-          echo "ADF_NAME: $ADF_NAME"
-          echo "ADF_RESOURCE_GROUP: $ADF_RESOURCE_GROUP"
-          if [ -z "$ADF_NAME" ]; then
-            echo "ERROR: ADF_NAME is empty or not set"
-            exit 1
-          fi
-          if [ -z "$ADF_RESOURCE_GROUP" ]; then
-            echo "ERROR: ADF_RESOURCE_GROUP is empty or not set"
-            exit 1
-          fi
-        shell: bash
-
-      # Stop triggers before deployment
-      - name: Stop running triggers in PROD
-        run: |
-          echo "Fetching triggers for factory: $ADF_NAME in resource group: $ADF_RESOURCE_GROUP"
-
-          # Verify factory exists
-          az datafactory show \
-            --resource-group "$ADF_RESOURCE_GROUP" \
-            --factory-name "$ADF_NAME" \
-            --query "name" -o tsv
-
-          # Get list of started triggers
-          names=$(az datafactory trigger list \
-            --resource-group "$ADF_RESOURCE_GROUP" \
-            --factory-name "$ADF_NAME" \
-            --query "[?properties.runtimeState=='Started'].name" -o tsv)
-
-          if [ -z "$names" ]; then
-            echo "No running triggers found"
-          else
-            echo "Found running triggers: $names"
-            for n in $names; do
-              echo "Stopping trigger: $n"
-              az datafactory trigger stop \
-                --resource-group "$ADF_RESOURCE_GROUP" \
-                --factory-name "$ADF_NAME" \
-                --name "$n"
-            done
-          fi
-        shell: bash
-
-      # Deploy ARM template with JSON parameters file
-      - name: Deploy ARM Template
-        uses: azure/arm-deploy@v1
+      - name: Deploy ARM template to ADF2
+        uses: azure/arm-deploy@v2
         with:
-          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          scope: resourcegroup
           resourceGroupName: ${{ secrets.ADF_RESOURCE_GROUP }}
-          template: mydatasfactorys2025/ARMTemplateForFactory.json
-          parameters: ./adf.parameters.json
-          deploymentName: adf-deploy-${{ github.run_number }}
-
-      # Start triggers after deployment
-      - name: Start stopped triggers in PROD
-        run: |
-          echo "Starting triggers for factory: $ADF_NAME in resource group: $ADF_RESOURCE_GROUP"
-
-          names=$(az datafactory trigger list \
-            --resource-group "$ADF_RESOURCE_GROUP" \
-            --factory-name "$ADF_NAME" \
-            --query "[?properties.runtimeState=='Stopped'].name" -o tsv)
-
-          if [ -z "$names" ]; then
-            echo "No stopped triggers found"
-          else
-            echo "Found stopped triggers: $names"
-            for n in $names; do
-              echo "Starting trigger: $n"
-              az datafactory trigger start \
-                --resource-group "$ADF_RESOURCE_GROUP" \
-                --factory-name "$ADF_NAME" \
-                --name "$n"
-            done
-          fi
-        shell: bash
+          template: ./ARMTemplateForFactory.json
+          parameters: ./ARMTemplateParametersForFactory.json
+          deploymentName: adf-cicd-deploy
+          parametersOverrides: >
+            factoryName=${{ secrets.ADF2_NAME }}
