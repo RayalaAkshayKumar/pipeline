@@ -1009,7 +1009,6 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT dno, \n       gender,\n       SUM(salary)  AS totsal,\n       COUNT(*)     AS cnt, \n       AVG(salary)  AS avgsal, \n       MAX(salary)  AS maxsal\nFROM emp\nGROUP BY dno, gender;\n",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
