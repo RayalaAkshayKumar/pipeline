@@ -34,7 +34,7 @@ jobs:
           resourceGroupName: ${{ secrets.ADF_RESOURCE_GROUP }}
           template: adf_publish/mydatafactorys2025/ARMTemplateForFactory.json
           parameters: |
-            adf_publish/mydatafactorys2025/ARMTemplateParametersForFactory.json
-            adf_publish/mydatafactorys2025/adf.parameters.json
+            mydatafactorys2025/ARMTemplateParametersForFactory.json
+            mydatafactorys2025/adf.parameters.json
             factoryName=${{ secrets.ADF2_NAME }}
           deploymentName: adf2-deploy-${{ github.run_number }}
