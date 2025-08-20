@@ -1,64 +1,39 @@
-name: Deploy ADF to Prod (on publish)
+name: Deploy ADF
 
 on:
   push:
     branches:
-      - main   # run whenever ADF Studio publishes
+      - main   # change if using another branch
 
 jobs:
-  deploy-adf:
+  deploy:
     runs-on: ubuntu-latest
-    env:
-      ADF2_NAME: ${{ secrets.ADF2_NAME }}
-      ADF2_RG:   ${{ secrets.ADF2_RESOURCE_GROUP }}
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Azure login (client secret)
-        uses: azure/login@v1
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          creds: |
-            {
-              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
-              "tenantId": "${{ secrets.AZURE_TENANT_ID }}",
-              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
-              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-            }
-      - name: Ensure Data Factory CLI extension
-        run: |
-          az extension add --name datafactory --only-show-errors || az extension update --name datafactory
-      - name: Stop running triggers in PROD
-        run: |
-          names=$(az datafactory trigger list \
-            --resource-group "$ADF2_RG" \
-            --factory-name "$ADF2_NAME" \
-            --query "[?properties.runtimeState=='Started'].name" -o tsv)
-          for n in $names; do
-            echo "Stopping trigger: $n"
-            az datafactory trigger stop --resource-group "$ADF2_RG" --factory-name "$ADF2_NAME" --name "$n"
-          done
-        shell: bash
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-      - name: Deploy ARM template to PROD
+      - name: Replace secrets in parameters file
+        run: |
+          sed -i "s|\"value\": \"\"|\"value\": \"${{ secrets.LS_SQL25_PASSWORD }}\"|" ARMTemplateParametersForFactory.json
+          sed -i "0,/\"value\": \"\"/s|\"value\": \"\"|\"value\": \"${{ secrets.LS_DATALAKE25_KEY }}\"|" ARMTemplateParametersForFactory.json
+          sed -i "0,/\"value\": \"\"/s|\"value\": \"\"|\"value\": \"${{ secrets.LS_MYSQL_PASSWORD }}\"|" ARMTemplateParametersForFactory.json
+          sed -i "0,/\"value\": \"\"/s|\"value\": \"\"|\"value\": \"${{ secrets.LS_SQLDB25_PASSWORD }}\"|" ARMTemplateParametersForFactory.json
+
+      - name: Deploy ARM template
         uses: azure/arm-deploy@v2
         with:
           scope: resourcegroup
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroupName: ${{ secrets.ADF2_RESOURCE_GROUP }}
-          template: ./mydatasfactorys2025/ARMTemplateForFactory.json
-          parameters: ./mydatasfactorys2025/ARMTemplateParametersForFactory.json
-          deploymentName: adf-publish-${{ github.run_number }}
-
-      - name: Start stopped triggers in PROD
-        run: |
-          names=$(az datafactory trigger list \
-            --resource-group "$ADF2_RG" \
-            --factory-name "$ADF2_NAME" \
-            --query "[?properties.runtimeState=='Stopped'].name" -o tsv)
-          for n in $names; do
-            echo "Starting trigger: $n"
-            az datafactory trigger start --resource-group "$ADF2_RG" --factory-name "$ADF2_NAME" --name "$n"
-          done
-        shell: bash
+          resourceGroupName: myResourceGroupName    # replace with your RG
+          template: ./ARMTemplateForFactory.json
+          parameters: ./ARMTemplateParametersForFactory.json
+          deploymentMode: Incremental
