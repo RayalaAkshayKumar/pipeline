@@ -31,7 +31,6 @@ jobs:
         run: |
           az extension add --name datafactory --only-show-errors || az extension update --name datafactory
 
-      # Stop triggers before deployment
       - name: Stop running triggers in PROD
         run: |
           names=$(az datafactory trigger list \
@@ -44,20 +43,16 @@ jobs:
           done
         shell: bash
 
-      # Deploy ARM templates
       - name: Deploy ARM template to PROD
         uses: azure/arm-deploy@v2
         with:
           scope: resourcegroup
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ secrets.ADF2_RESOURCE_GROUP }}
-          template: ./ARMTemplateForFactory.json
-          parameters: ./ARMTemplateParametersForFactory.json
+          template: ./mydatasfactorys2025/ARMTemplateForFactory.json
+          parameters: ./mydatasfactorys2025/ARMTemplateParametersForFactory.json
           deploymentName: adf-publish-${{ github.run_number }}
-          parametersOverrides: >
-            factoryName=${{ secrets.ADF2_NAME }}
 
-      # Start triggers again
       - name: Start stopped triggers in PROD
         run: |
           names=$(az datafactory trigger list \
