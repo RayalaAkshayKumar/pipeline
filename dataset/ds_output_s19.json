@@ -1,0 +1,27 @@
+{
+	"name": "ds_output_s19",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "datalake_ls_se17",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileSystem": "output"
+			},
+			"columnDelimiter": "\t",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": ""
+		},
+		"schema": [
+			{
+				"name": "id,name,salary,gender,dno",
+				"type": "String"
+			}
+		]
+	}
+}
